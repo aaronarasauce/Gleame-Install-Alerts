@@ -186,13 +186,29 @@ def send_email(subject, message, priority, tag):
         server.send_message(email)
 
 
-CHANNELS = {"ntfy": send_ntfy, "Slack": send_slack, "email": send_email}
+# Each channel, and the secret that switches it on. A channel with no secret is skipped,
+# so you can add one later just by adding its secret in GitHub.
+CHANNELS = {
+    "ntfy": (send_ntfy, "NTFY_TOPIC"),
+    "Slack": (send_slack, "SLACK_WEBHOOK_URL"),
+    "email": (send_email, "GMAIL_APP_PASSWORD"),
+}
+
+
+def active_channels():
+    return {name: send for name, (send, key) in CHANNELS.items() if os.environ.get(key, "").strip()}
 
 
 def notify_all(subject, message, priority, tag):
-    """Sends to every channel, even if some fail. Returns the names of the ones that failed."""
+    """Sends to every set-up channel, even if some fail. Returns the names of the ones that failed."""
+    channels = active_channels()
+    for name in CHANNELS.keys() - channels.keys():
+        print(f"  {name}: skipped (not set up)")
+    if not channels:
+        print("  No channels are set up - add the GitHub secrets.")
+        return ["all channels"]
     failed = []
-    for name, send in CHANNELS.items():
+    for name, send in channels.items():
         try:
             send(subject, message, priority, tag)
             print(f"  {name}: sent")
@@ -243,7 +259,7 @@ def run_test(now):
     failed = notify_all("🧪 Gleame alerts test", message, "high", "test_tube")
     if failed or "FAILED" in shopify:
         sys.exit("Test finished with problems - see the lines above.")
-    print("Test passed: all three channels sent.")
+    print(f"Test passed: sent to {', '.join(active_channels())}.")
 
 
 def main():
@@ -283,7 +299,7 @@ def main():
         print(f"New {kind}:")
         failed = notify_all(*describe(event))
         problems += failed
-        if len(failed) == len(CHANNELS):
+        if len(failed) >= len(active_channels()):
             continue  # nothing got through, so try this one again next run
         seen[key] = event["occurredAt"]
         counts[kind + "s"] += 1

@@ -18,6 +18,7 @@ Passwords and tokens are **not** in any file. They're stored as GitHub secrets
 (Settings → Secrets and variables → Actions):
 `SHOPIFY_PARTNER_TOKEN`, `NTFY_TOPIC`, `SLACK_WEBHOOK_URL`, `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD`,
 and optionally `EMAIL_TO` (if alerts should go to a different address than the Gmail account).
+A channel whose secret isn't set is simply skipped. To add Slack later, just add `SLACK_WEBHOOK_URL`.
 
 ## Add a store to the ignore list
 
