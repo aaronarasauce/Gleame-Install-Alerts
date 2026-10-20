@@ -1,0 +1,45 @@
+name: Install alerts
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"  # every 10 minutes (GitHub sometimes runs it a few minutes late)
+  workflow_dispatch:
+    inputs:
+      test:
+        description: "Send a test message to all three channels"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write  # lets the run save state.json back to the repo
+
+concurrency:
+  group: install-alerts  # never run two checks at once
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check Shopify and send alerts
+        env:
+          SHOPIFY_PARTNER_TOKEN: ${{ secrets.SHOPIFY_PARTNER_TOKEN }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+        run: python3 notify.py ${{ inputs.test && '--test' || '' }}
+
+      - name: Remember which alerts were sent
+        if: always()
+        run: |
+          [ -f state.json ] || exit 0
+          git add state.json
+          git diff --cached --quiet && exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Update sent-alert memory"
+          git pull --rebase && git push
