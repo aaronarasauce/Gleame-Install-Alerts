@@ -1,0 +1,3 @@
+# Stores to ignore (your dev stores, Shopify's app reviewer stores).
+# Put one myshopify domain per line below, like:  my-dev-store.myshopify.com
+# Lines starting with # are notes and are skipped.
