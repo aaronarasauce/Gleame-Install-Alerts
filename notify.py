@@ -150,7 +150,7 @@ def describe(event):
     shop = f"{event['shop']['name']} ({event['shop']['myshopifyDomain']})"
     if event["type"] == "RELATIONSHIP_INSTALLED":
         message = f"🟢 New Gleame install: {shop} at {pacific(parse(event['occurredAt']))}"
-        return f"🟢 New Gleame install: {event['shop']['name']}", message, "high", "green_circle"
+        return f"🟢 New Gleame install: {event['shop']['name']}", message, "urgent", "green_circle"
 
     duration = time_installed(event)
     after = f" after {friendly_duration(duration)}" if duration is not None else ""
@@ -159,6 +159,30 @@ def describe(event):
         reason += f' ("{event["description"]}")'
     message = f"🔴 Gleame uninstall: {shop}{after}. Reason: {reason}"
     return f"🔴 Gleame uninstall: {event['shop']['name']}", message, "default", "red_circle"
+
+
+def recent_pushes():
+    """ntfy's last 12 hours of messages on our topic (empty if unavailable)."""
+    try:
+        req = urllib.request.Request(f"https://ntfy.sh/{secret('NTFY_TOPIC')}/json?poll=1&since=12h")
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            lines = resp.read().decode().splitlines()
+        return [json.loads(line) for line in lines if line.strip()]
+    except Exception:
+        return []
+
+
+def sent_by_mac(event, pushes):
+    """True if the Mac's fast-alerts script already sent this event (push and email).
+
+    It pushes with the same wording, and tags the push "email_failed" when its
+    email didn't go out, in which case we still send everything.
+    """
+    start = "🟢 New Gleame install:" if event["type"] == "RELATIONSHIP_INSTALLED" else "🔴 Gleame uninstall:"
+    domain = f"({event['shop']['myshopifyDomain']})"
+    after = parse(event["occurredAt"]).timestamp() - 60
+    return any(p.get("message", "").startswith(start) and domain in p["message"] and p.get("time", 0) >= after
+               and "email_failed" not in p.get("tags", []) for p in pushes)
 
 
 # ---------- Channels ----------
@@ -287,6 +311,7 @@ def main():
     ignored = load_ignore_list()
     counts = state.setdefault("counts", {"installs": 0, "uninstalls": 0})
     problems = []
+    pushes = None
     for event in events:
         key = fingerprint(event)
         if key in seen:
@@ -295,6 +320,12 @@ def main():
         if event["shop"]["myshopifyDomain"].lower() in ignored:
             print(f"Skipped an {kind} from a store on the ignore list.")
             seen[key] = event["occurredAt"]
+            continue
+        pushes = recent_pushes() if pushes is None else pushes
+        if sent_by_mac(event, pushes):
+            print(f"Skipped an {kind}: the Mac already sent it.")
+            seen[key] = event["occurredAt"]
+            counts[kind + "s"] += 1
             continue
         print(f"New {kind}:")
         failed = notify_all(*describe(event))
