@@ -1,9 +1,9 @@
 {
   "counts": {
-    "installs": 1,
-    "uninstalls": 1
+    "installs": 0,
+    "uninstalls": 0
   },
-  "last_heartbeat": "2026-11-21",
+  "last_heartbeat": "2026-11-22",
   "seen": {
     "056c449d87214345": "2026-11-21T23:35:45.000000Z",
     "315a7fe5f1dc639b": "2026-11-20T21:52:25.000000Z",
